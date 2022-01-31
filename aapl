@@ -1,0 +1,138 @@
+library(dplyr)
+library(readr)
+library(quantmod)
+library(faux)
+
+n<-10000 #n is number of simulations
+
+co1<-"GOOG"
+co2<-"AMZN"
+co3<-"AAPL"
+co4<-"MSFT"
+co5<-"TSLA"
+co6<-"2222.SR"
+co6exch<-"SARUSD=X"
+
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2022-12-30")    
+expctdAnnRtrn<-0
+r<-exp(log(1+expctdAnnRtrn)/365)-1
+
+remainingCloses<-sum(!weekdays(seq(stDt, endDt, "days")) %in% c("Saturday", "Sunday"))
+
+#company 1
+histData1<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co1
+    , "?period1=946684800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory1<-as.numeric(histData1$`Adj Close`)#[!is.na(pricehistory)]
+pricehistory1<-pricehistory1[!is.na(pricehistory1)]
+
+cap1<-getQuote(co1, what = yahooQF(c("Market Capitalization")))[,2]
+sdMovementRatio1 <- sd(log(pricehistory1[1:length(pricehistory1)-1]/pricehistory1[2:(length(pricehistory1))]))
+
+#company 2
+histData2<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co2
+    , "?period1=946684800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory2<-as.numeric(histData2$`Adj Close`)#[!is.na(pricehistory)]
+pricehistory2<-pricehistory2[!is.na(pricehistory2)]
+
+cap2<-getQuote(co2, what = yahooQF(c("Market Capitalization")))[,2]
+
+sdMovementRatio2 <- sd(log(pricehistory2[1:length(pricehistory2)-1]/pricehistory2[2:(length(pricehistory2))]))
+
+#company 3
+histData3<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co3
+    , "?period1=946684800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory3<-as.numeric(histData3$`Adj Close`)#[!is.na(pricehistory)]
+pricehistory3<-pricehistory3[!is.na(pricehistory3)]
+
+cap3<-getQuote(co3, what = yahooQF(c("Market Capitalization")))[,2]
+
+sdMovementRatio3 <- sd(log(pricehistory3[1:length(pricehistory3)-1]/pricehistory3[2:(length(pricehistory3))]))
+
+#company 4
+histData4<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co4
+    , "?period1=946684800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory4<-as.numeric(histData4$`Adj Close`)#[!is.na(pricehistory)]
+pricehistory4<-pricehistory4[!is.na(pricehistory4)]
+
+cap4<-getQuote(co4, what = yahooQF(c("Market Capitalization")))[,2]
+
+sdMovementRatio4 <- sd(log(pricehistory4[1:length(pricehistory4)-1]/pricehistory4[2:(length(pricehistory4))]))
+
+#company 5
+histData5<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co5
+    , "?period1=946684800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory5<-as.numeric(histData5$`Adj Close`)#[!is.na(pricehistory)]
+pricehistory5<-pricehistory5[!is.na(pricehistory5)]
+
+cap5<-getQuote(co5, what = yahooQF(c("Market Capitalization")))[,2]
+
+sdMovementRatio5 <- sd(log(pricehistory5[1:length(pricehistory5)-1]/pricehistory5[2:(length(pricehistory5))]))
+
+#company 6 Saudi-Aramco
+histData6<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co6
+    , "?period1=946684800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory6<-as.numeric(histData6$`Adj Close`)#[!is.na(pricehistory)]
+pricehistory6<-pricehistory6[!is.na(pricehistory6)]
+
+exch6<-getQuote(co6exch)[,2]
+cap6<-exch6 * getQuote(co6, what = yahooQF(c("Market Capitalization")))[,2]
+
+sdMovementRatio6 <- sd(log(pricehistory6[1:length(pricehistory6)-1]/pricehistory6[2:(length(pricehistory6))]))
+
+mcaps<-c(cap1,cap2,cap3,cap4,cap5,cap6)
+
+#the correlation matrix is hard-coded. It was hard to calculate due to different timezones and non-trading days
+cmat<-matrix(c(1,0.656,0.667,0.816,0.41,0.24,0.656,1,0.673,0.709,0.429,0.201,0.667,0.673,1,0.801,0.454,0.211,0.816,0.709,0.801,1,0.47,0.261,0.41,0.429,0.454,0.47,1,0.155,0.24,0.201,0.211,0.261,0.155,1),6,6)
+
+result<-matrix(as.matrix(replicate(n,cumprod(exp(rnorm_multi(remainingCloses,mu=rep(0,6),sd=c(sdMovementRatio1,sdMovementRatio2,sdMovementRatio3,sdMovementRatio4,sdMovementRatio5,sdMovementRatio6),r=cmat,empirical=FALSE)))[remainingCloses,])),n,6)
+result<-matrix(unlist(result),byrow=TRUE,nrow = n)
+result<-t(t(result)*mcaps)
+
+winner<-apply(result,1,which.max)
+output<-c(sum(winner==1)/n,sum(winner==2)/n,sum(winner==3)/n,sum(winner==4)/n,sum(winner==5)/n,sum(winner==6)/n)
+
+#the third value is for AAPL and the sixth is for Saudi-Aramco
+output
