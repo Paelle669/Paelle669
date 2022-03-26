@@ -9,7 +9,7 @@ expctdAnnRtrn<-0.0 #expected market return - did I mention I'm a pessimist?
 
 r<-exp(log(1+expctdAnnRtrn)/365)-1
 remainingCloses<-sum(!weekdays(seq(stDt, endDt, "days")) %in% c("Saturday", "Sunday"))
-remainingCloses<-remainingCloses-1
+remainingCloses<-remainingCloses - 1 #public holiday to commemorate pagan festival of the spring equinox
 histData<-read_csv(
   paste0(
     "https://query1.finance.yahoo.com/v7/finance/download/"
