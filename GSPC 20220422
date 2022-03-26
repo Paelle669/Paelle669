@@ -1,0 +1,28 @@
+library(dplyr)
+library(readr)
+
+n<-10000
+company<-"^GSPC"
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2022-04-22")    
+expctdAnnRtrn<-0.0 #expected market return - did I mention I'm a pessimist?
+
+r<-exp(log(1+expctdAnnRtrn)/365)-1
+remainingCloses<-sum(!weekdays(seq(stDt, endDt, "days")) %in% c("Saturday", "Sunday"))
+remainingCloses<-remainingCloses-1
+histData<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , company
+    , "?period1=1325548800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory<-as.numeric(histData$`Adj Close`)
+pricehistory<-pricehistory[!is.na(pricehistory)]
+thresh<-max(pricehistory)
+spot<-pricehistory[length(pricehistory)]
+sdMovementRatio <- sd(log(pricehistory[1:length(pricehistory)-1]/pricehistory[2:(length(pricehistory))]))
+simulation<-replicate(n,max(spot*cumprod(exp(rnorm(remainingCloses,mean = r, sd = sdMovementRatio)))))
+length(simulation[simulation>thresh])/n
