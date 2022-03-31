@@ -1,0 +1,28 @@
+library(dplyr)
+library(readr)
+company<-"ZW=F"
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2022-06-15")    
+remainingCloses<-sum(!weekdays(seq(stDt, endDt, "days")) %in% c("Saturday", "Sunday"))
+
+forecastBands <- c(-Inf,700,825,950,1075,1200,Inf)
+histData<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , company
+    , "?period1=963792000&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory<-as.numeric(histData$`Adj Close`)
+pricehistory<-pricehistory[!is.na(pricehistory)]
+spot<-pricehistory[length(pricehistory)]
+sdMovementRatio <- sd(log(pricehistory[1:length(pricehistory)-1]/pricehistory[2:(length(pricehistory))]))
+
+simulation<-spot*replicate(10000,
+                           cumprod(exp(rnorm(
+                             remainingCloses,mean = 0, sd = sdMovementRatio
+                           )))[remainingCloses])
+cutSimulation<-as_tibble(cut(simulation,forecastBands))
+mutate(count(cutSimulation,value),n/sum(n))
