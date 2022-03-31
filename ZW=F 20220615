@@ -1,11 +1,14 @@
 library(dplyr)
 library(readr)
+#set initial variables
 company<-"ZW=F"
 stDt <- as.Date(Sys.time())
 endDt <- as.Date("2022-06-15")    
 remainingCloses<-sum(!weekdays(seq(stDt, endDt, "days")) %in% c("Saturday", "Sunday"))
-
+remainingCloses<-remainingCloses - 2 #stock market holidays
 forecastBands <- c(-Inf,700,825,950,1075,1200,Inf)
+trials<-10000
+#get historcal data and set associated variables
 histData<-read_csv(
   paste0(
     "https://query1.finance.yahoo.com/v7/finance/download/"
@@ -16,13 +19,14 @@ histData<-read_csv(
   )
 )
 pricehistory<-as.numeric(histData$`Adj Close`)
-pricehistory<-pricehistory[!is.na(pricehistory)]
+pricehistory<-pricehistory[!is.na(pricehistory)] #just in case
 spot<-pricehistory[length(pricehistory)]
-sdMovementRatio <- sd(log(pricehistory[1:length(pricehistory)-1]/pricehistory[2:(length(pricehistory))]))
-
-simulation<-spot*replicate(10000,
+sdLogMvmt <- sd(log(pricehistory[1:length(pricehistory)-1]/pricehistory[2:(length(pricehistory))]))
+#run simulations
+simulation<-spot*replicate(trials,
                            cumprod(exp(rnorm(
-                             remainingCloses,mean = 0, sd = sdMovementRatio
+                             remainingCloses,mean = 0, sd = sdLogMvmt
                            )))[remainingCloses])
+#report simulation results
 cutSimulation<-as_tibble(cut(simulation,forecastBands))
 mutate(count(cutSimulation,value),n/sum(n))
