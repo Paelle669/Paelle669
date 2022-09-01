@@ -1,0 +1,143 @@
+library(dplyr)
+library(readr)
+library(quantmod)
+library(faux)
+
+rm(list=ls())
+
+n<-10000
+
+co1<-"BTC-USD"
+co2<-"ADA-USD"
+co3<-"ETH-USD"
+co4<-"SOL-USD"
+co5<-"XRP-USD"
+
+histSt <- as.Date("2020-04-13") #approx date all cryptos trading
+histSt <- as.character(floor(as.numeric(as.POSIXct(histSt))))
+
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2022-11-29") 
+
+remainingCloses<-length(seq(stDt, endDt, "days"))
+
+#company 1
+histData1<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co1
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData1<-data.frame(histData1)
+start1<- histData1 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
+pricehistory1<-as.numeric(histData1$Adj.Close)
+pricehistory1<-pricehistory1[!is.na(pricehistory1)]
+spot1<-pricehistory1[length(pricehistory1)]
+sdMovementRatio1 <- sd(log(pricehistory1[1:length(pricehistory1)-1]/pricehistory1[2:(length(pricehistory1))]))
+
+#company 2
+histData2<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co2
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData2<-data.frame(histData2)
+start2<- histData2 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
+pricehistory2<-as.numeric(histData2$Adj.Close)
+pricehistory2<-pricehistory2[!is.na(pricehistory2)]
+spot2<-pricehistory2[length(pricehistory2)]
+sdMovementRatio2 <- sd(log(pricehistory2[1:length(pricehistory2)-1]/pricehistory2[2:(length(pricehistory2))]))
+
+#company 3
+histData3<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co3
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData3<-data.frame(histData3)
+start3<- histData3 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
+pricehistory3<-as.numeric(histData3$Adj.Close)
+pricehistory3<-pricehistory3[!is.na(pricehistory3)]
+spot3<-pricehistory3[length(pricehistory3)]
+sdMovementRatio3 <- sd(log(pricehistory3[1:length(pricehistory3)-1]/pricehistory3[2:(length(pricehistory3))]))
+
+#company 4
+histData4<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co4
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData4<-data.frame(histData4)
+start4<- histData4 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
+pricehistory4<-as.numeric(histData4$Adj.Close)
+pricehistory4<-pricehistory4[!is.na(pricehistory4)]
+spot4<-pricehistory4[length(pricehistory4)]
+sdMovementRatio4 <- sd(log(pricehistory4[1:length(pricehistory4)-1]/pricehistory4[2:(length(pricehistory4))]))
+
+#company 5
+histData5<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co5
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData5<-data.frame(histData5)
+start5<- histData5 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
+pricehistory5<-as.numeric(histData5$Adj.Close)
+pricehistory5<-pricehistory5[!is.na(pricehistory5)]
+spot5<-pricehistory5[length(pricehistory5)]
+sdMovementRatio5 <- sd(log(pricehistory5[1:length(pricehistory5)-1]/pricehistory5[2:(length(pricehistory5))]))
+
+cmat <- cor(
+             cbind(
+                    pricehistory1
+                  , pricehistory2
+                  , pricehistory3
+                  , pricehistory4
+                  , pricehistory5
+             )
+        )
+
+startpoints<-c(start1,start2,start3,start4,start5)
+result<-matrix(
+            replicate(n,
+              cumprod(exp(rnorm_multi(  remainingCloses
+                                      ,  mu=rep(0,5)
+                                      ,  sd=c(  sdMovementRatio1
+                                              , sdMovementRatio2
+                                              , sdMovementRatio3
+                                              , sdMovementRatio4
+                                              , sdMovementRatio5
+                                              )
+                                      ,  r=cmat
+                                      ,  empirical=FALSE))
+              )[remainingCloses,]
+            )
+          ,  nrow = n
+          ,  ncol = 5
+          ,  byrow=FALSE
+          )
+
+result<-matrix(unlist(result),nrow = n)
+result <- t(t(result)*(c(spot1,spot2,spot3,spot4,spot5)/c(start1,start2,start3,start4,start5)))
+winner<-apply(result,1,which.max)
+output<-c(sum(winner==1)/n,sum(winner==2)/n,sum(winner==3)/n,sum(winner==4)/n,sum(winner==5)/n)
+output
