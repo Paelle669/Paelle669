@@ -13,6 +13,12 @@ co3<-"ETH-USD"
 co4<-"SOL-USD"
 co5<-"XRP-USD"
 
+start1 <- 30280.67
+start2 <- 0.5325
+start3 <- 2017.27
+start4 <- 52.12
+start5 <- 0.41439
+
 histSt <- as.Date("2020-04-13") #approx date all cryptos trading
 histSt <- as.character(floor(as.numeric(as.POSIXct(histSt))))
 
@@ -32,7 +38,6 @@ histData1<-read_csv(
   )
 )
 histData1<-data.frame(histData1)
-start1<- histData1 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
 pricehistory1<-as.numeric(histData1$Adj.Close)
 pricehistory1<-pricehistory1[!is.na(pricehistory1)]
 spot1<-pricehistory1[length(pricehistory1)]
@@ -49,7 +54,6 @@ histData2<-read_csv(
   )
 )
 histData2<-data.frame(histData2)
-start2<- histData2 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
 pricehistory2<-as.numeric(histData2$Adj.Close)
 pricehistory2<-pricehistory2[!is.na(pricehistory2)]
 spot2<-pricehistory2[length(pricehistory2)]
@@ -66,7 +70,6 @@ histData3<-read_csv(
   )
 )
 histData3<-data.frame(histData3)
-start3<- histData3 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
 pricehistory3<-as.numeric(histData3$Adj.Close)
 pricehistory3<-pricehistory3[!is.na(pricehistory3)]
 spot3<-pricehistory3[length(pricehistory3)]
@@ -83,7 +86,6 @@ histData4<-read_csv(
   )
 )
 histData4<-data.frame(histData4)
-start4<- histData4 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
 pricehistory4<-as.numeric(histData4$Adj.Close)
 pricehistory4<-pricehistory4[!is.na(pricehistory4)]
 spot4<-pricehistory4[length(pricehistory4)]
@@ -100,7 +102,6 @@ histData5<-read_csv(
   )
 )
 histData5<-data.frame(histData5)
-start5<- histData5 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull()
 pricehistory5<-as.numeric(histData5$Adj.Close)
 pricehistory5<-pricehistory5[!is.na(pricehistory5)]
 spot5<-pricehistory5[length(pricehistory5)]
