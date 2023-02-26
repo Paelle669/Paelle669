@@ -1,0 +1,53 @@
+library(dplyr)
+library(readr)
+rm(list=ls())
+
+trials <- 10000
+company <-"^GSPC"
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2023-07-28")
+expctdAnnRtrn <- 0.0 
+r<-exp(log(1+expctdAnnRtrn)/365)-1
+dates <- seq(stDt, endDt, "days")
+phols <- as.Date(c(
+  "2022-12-26"
+  ,"2023-01-02","2023-01-16","2023-02-20","2023-04-07","2023-05-29","2023-06-19","2023-07-04","2023-09-04","2023-11-23","2023-12-25"
+  ,"2024-01-01","2024-01-15","2024-02-19","2024-03-29","2024-05-27","2024-06-19","2024-07-04","2024-09-02","2024-11-28","2024-12-25"
+))
+dates <- dates[!dates %in% phols]
+dates <- dates[!weekdays(dates) %in% c("Saturday", "Sunday")]
+remainingCloses <- length(dates)
+
+forecastBands <- c(-Inf,3150,3400,3650,3900,4150,4400,4650,Inf)
+
+histData<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , company
+    , "?period1=1325548800&period2="
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+pricehistory<-as.numeric(histData$`Adj Close`)
+pricehistory<-pricehistory[!is.na(pricehistory)]
+
+spot<-pricehistory[length(pricehistory)]
+sdMovementRatio <- sd(log(pricehistory[1:length(pricehistory)-1]/pricehistory[2:(length(pricehistory))]))
+
+simulation<-spot*replicate(trials,
+                             cumprod(exp(rnorm(
+                               remainingCloses,mean = r, sd = sdMovementRatio
+                             )))[remainingCloses])
+cutSimulation<-as_tibble(cut(simulation,forecastBands))
+
+par(mfrow=c(1,2))
+hist(simulation, breaks = 50, main = paste0(company," ", endDt))
+maxx<-length(pricehistory)
+minx<-maxx-20
+pricehistory<-pricehistory[minx:maxx]
+maxy<- max(pricehistory)*1.01
+miny<- min(pricehistory)*0.8
+plot(pricehistory, type = "b", pch = "+", col="darkblue", ylim = c(miny,maxy), main = paste0(company," ", endDt))
+par(mfrow=c(1,1))
+mutate(dplyr::count(cutSimulation,value),n/sum(n))
