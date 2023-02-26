@@ -1,3 +1,4 @@
+#https://www.gjopen.com/questions/2670-what-will-be-the-closing-value-of-the-s-p-500-index-on-28-july-2023
 library(dplyr)
 library(readr)
 rm(list=ls())
