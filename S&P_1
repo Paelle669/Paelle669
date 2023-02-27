@@ -3,6 +3,7 @@ library(dplyr)
 library(readr)
 rm(list=ls())
 
+#this script produces a distributions of S&P500 prices as at 28/7/2023
 company <-"^GSPC"
 stDt <- as.Date(Sys.time())     #start date of simulation
 endDt <- as.Date("2023-07-28")  #end date of simulation
