@@ -3,23 +3,26 @@ library(dplyr)
 library(readr)
 rm(list=ls())
 
-trials <- 10000
 company <-"^GSPC"
-stDt <- as.Date(Sys.time())
-endDt <- as.Date("2023-07-28")
-expctdAnnRtrn <- 0.0 
-r<-exp(log(1+expctdAnnRtrn)/365)-1
+stDt <- as.Date(Sys.time())     #start date of simulation
+endDt <- as.Date("2023-07-28")  #end date of simulation
+trials <- 10000                 #number of simulations
+expctdAnnRtrn <- 0.0            #expected annual returm (I'm a pessimist)
+recentHist <- 20                #days recent price histry to plot
+
+r <- exp(log(1+expctdAnnRtrn)/365)-1
 dates <- seq(stDt, endDt, "days")
+
 phols <- as.Date(c(
-  "2022-12-26"
-  ,"2023-01-02","2023-01-16","2023-02-20","2023-04-07","2023-05-29","2023-06-19","2023-07-04","2023-09-04","2023-11-23","2023-12-25"
+  "2023-01-02","2023-01-16","2023-02-20","2023-04-07","2023-05-29","2023-06-19","2023-07-04","2023-09-04","2023-11-23","2023-12-25"
   ,"2024-01-01","2024-01-15","2024-02-19","2024-03-29","2024-05-27","2024-06-19","2024-07-04","2024-09-02","2024-11-28","2024-12-25"
 ))
+
 dates <- dates[!dates %in% phols]
 dates <- dates[!weekdays(dates) %in% c("Saturday", "Sunday")]
 remainingCloses <- length(dates)
 
-forecastBands <- c(-Inf,3150,3400,3650,3900,4150,4400,4650,Inf)
+forecastBins <- c(-Inf,3150,3400,3650,3900,4150,4400,4650,Inf)
 
 histData<-read_csv(
   paste0(
@@ -34,21 +37,33 @@ pricehistory<-as.numeric(histData$`Adj Close`)
 pricehistory<-pricehistory[!is.na(pricehistory)]
 
 spot<-pricehistory[length(pricehistory)]
+#calculate the standard deviation of the natural log of historical daily proportional price movements
 sdMovementRatio <- sd(log(pricehistory[1:length(pricehistory)-1]/pricehistory[2:(length(pricehistory))]))
 
+#run simulations as vectors of starting sport price x cumulative product or log normally distributed random variable:
 simulation<-spot*replicate(trials,
-                             cumprod(exp(rnorm(
-                               remainingCloses,mean = r, sd = sdMovementRatio
-                             )))[remainingCloses])
-cutSimulation<-as_tibble(cut(simulation,forecastBands))
+                           cumprod(exp(rnorm(
+                             remainingCloses,mean = r, sd = sdMovementRatio
+                           )))[remainingCloses])
 
-par(mfrow=c(1,2))
+#classify results by forcact band
+cutSimulation<-as_tibble(cut(simulation,forecastBins))
+simTable <- as.data.frame(mutate(dplyr::count(cutSimulation,value),n/sum(n)))
+simTable$sortOrder <- c(nrow(simTable):1)
+simTable <- arrange(simTable, sortOrder)
+
+
+par(mfrow=c(2,2))
+ylim_hist <- c(min(pricehistory) * 0.95, max(pricehistory) * 1.01)
+plot(pricehistory, type = "b", pch = "+", col="darkblue", ylim = ylim_hist, main = paste0(company," History"))
+
+pricehistoryRecent <- pricehistory[(length(pricehistory)-recentHist+ 1):length(pricehistory)]
+ylim_recent <- c(min(pricehistoryRecent) * 0.95, max(pricehistoryRecent) * 1.01)
+
+plot(pricehistoryRecent, type = "b", pch = "+", col="darkblue", ylim = ylim_recent, main = paste0(company," Recent History"))
 hist(simulation, breaks = 50, main = paste0(company," ", endDt))
-maxx<-length(pricehistory)
-minx<-maxx-20
-pricehistory<-pricehistory[minx:maxx]
-maxy<- max(pricehistory)*1.01
-miny<- min(pricehistory)*0.8
-plot(pricehistory, type = "b", pch = "+", col="darkblue", ylim = c(miny,maxy), main = paste0(company," ", endDt))
+bp <- barplot(simTable$`n/sum(n)`,names.arg=simTable$value,main = "Prob by Bin", horiz=TRUE,col="palegreen4")
+barlabels <- simTable$`n/sum(n)` + 0.01 + (simTable$`n/sum(n)` > 1/(nrow(simTable)+1)) * -0.02
+text(barlabels,bp, paste(format(round(simTable$`n/sum(n)` * 100,1) ,T),"%", sep=""))
 par(mfrow=c(1,1))
 mutate(dplyr::count(cutSimulation,value),n/sum(n))
