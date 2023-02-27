@@ -54,16 +54,37 @@ simTable <- arrange(simTable, sortOrder)
 
 
 par(mfrow=c(2,2))
+#plot all history
 ylim_hist <- c(min(pricehistory) * 0.95, max(pricehistory) * 1.01)
-plot(pricehistory, type = "b", pch = "+", col="darkblue", ylim = ylim_hist, main = paste0(company," History"))
+plot(pricehistory
+     , type = "b"
+     , pch = "+"
+     , col="darkblue"
+     , ylim = ylim_hist
+     , main = paste0(company," History")
+     )
 
+#plot recent history
 pricehistoryRecent <- pricehistory[(length(pricehistory)-recentHist+ 1):length(pricehistory)]
 ylim_recent <- c(min(pricehistoryRecent) * 0.95, max(pricehistoryRecent) * 1.01)
+plot(pricehistoryRecent
+     , type = "b"
+     , pch = "+"
+     , col="darkblue"
+     , ylim = ylim_recent
+     , main = paste0(company," Recent History")
+     )
 
-plot(pricehistoryRecent, type = "b", pch = "+", col="darkblue", ylim = ylim_recent, main = paste0(company," Recent History"))
+#Hisotgram all trial outcomes
 hist(simulation, breaks = 50, main = paste0(company," ", endDt))
-bp <- barplot(simTable$`n/sum(n)`,names.arg=simTable$value,main = "Prob by Bin", horiz=TRUE,col="palegreen4")
+
+#barplot forecast bins
+bp <- barplot(simTable$`n/sum(n)`
+      , names.arg=simTable$value
+      , main = "Prob by Bin"
+      , horiz=TRUE
+      , col="palegreen4")
 barlabels <- simTable$`n/sum(n)` + 0.01 + (simTable$`n/sum(n)` > 1/(nrow(simTable)+1)) * -0.02
 text(barlabels,bp, paste(format(round(simTable$`n/sum(n)` * 100,1) ,T),"%", sep=""))
+
 par(mfrow=c(1,1))
-mutate(dplyr::count(cutSimulation,value),n/sum(n))
