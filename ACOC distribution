@@ -1,0 +1,190 @@
+########################
+#this part once only
+install.packages("dplyr")
+install.packages("tidyverse")
+install.packages("fitdistrplus")
+install.packages("tidyr")
+
+library(dplyr)
+library(tidyverse)
+library(fitdistrplus)
+library(tidyr)
+
+#manual input section
+#load some data
+#the output of the report to be developed:
+#copy the worksheet to the clipboard the headings must be as follows (case sensitive)
+## CIMS_CLAIM_NUMBER
+## ASSESSOR
+## DATE_CLAIM_NOTIFIED
+## CLAIM_STATUS
+## PAID_TO_DATE
+## RESERVE
+## CLOSED_DATE
+all <- read.table(file = "clipboard", sep = "\t", header=TRUE)
+
+#copy the list of event CIMS_CLAIM_NUMBERs to the clipboard. It must be headed CIMS_CLAIM_NUMBER
+event_claim <- read.table(file = "clipboard", sep = "\t", header=TRUE)
+
+#the following inputs are needed
+
+#I'm not sure of the exact cutoff value
+cost_threshold <- 400000 #certificates above this value are excluded
+#confirm that the cutoff is 30 September
+termDt <- as.Date("2022-09-30")
+
+#days remaining is derived from above
+d_rem <- as.numeric(termDt - Sys.Date()) #days remaining till incentive termination date
+
+#the values here are from the data from matthew hooker - it isn't right for this purpose
+total_ytd_included_cost <- 3000000
+total_ytd_included_closed_claims <- 100
+
+#set parameters for this script
+maxp_nil <- 0.9 #max probability that an open nil claim will close at nil
+rplctns <- 10000 #number of stochastic trials
+
+#convert the date formats
+all$DATE_CLAIM_NOTIFIED <- as.Date(all$DATE_CLAIM_NOTIFIED,"%d/%m/%Y")
+all$CLOSED_DATE <- as.Date(all$CLOSED_DATE,"%d/%m/%Y")
+
+#exclude the event claim certificates
+all <- all %>% filter(!CIMS_CLAIM_NUMBER %in% event_claim$CIMS_CLAIM_NUMBER)
+
+#put the open certs in a data frame - this is the target set
+open<-all %>% filter(CLAIM_STATUS=="OPEN")
+open <- open %>% mutate(duration = as.numeric(as.Date(Sys.time()) - open$DATE_CLAIM_NOTIFIED))
+n_r <- nrow(open) #this is useful later
+
+#put the current assessors in a single column data frame
+curr_assessor <- unique(open$ASSESSOR)
+
+#store the count
+curr_assessor_n <- length(curr_assessor)
+
+#put the closed claims belonging to a current assessor in a data frame
+#this is the binomial training set
+closed_inc_nil <- all %>% filter(CLAIM_STATUS=="CLOSED", ASSESSOR %in% curr_assessor)
+closed_inc_nil <- mutate(closed_inc_nil, has_cost = PAID_TO_DATE > 0)
+#this is the weibull training set
+closed <- closed_inc_nil %>% filter(PAID_TO_DATE > 0)
+closed <- closed %>% mutate(duration = as.numeric(closed$CLOSED_DATE - closed$DATE_CLAIM_NOTIFIED))
+
+
+#get the assessors with at least 10 certs and put their names in a single column data frame
+large_assessor <- closed %>% filter(ASSESSOR %in% curr_assessor) %>% group_by(ASSESSOR) %>% summarise(n=n()) %>% as.data.frame() %>% filter(n >= 10)
+
+#store the count
+large_assessor_n <- nrow(large_assessor)
+
+#get the assessors with < 10 certs and put their names in a single column data frame
+small_assessor <- closed %>% filter(ASSESSOR %in% curr_assessor) %>% group_by(ASSESSOR) %>% summarise(n=n()) %>% as.data.frame() %>% filter(n < 10)
+
+#store the count
+small_assessor_n <- nrow(small_assessor)
+
+closed_has_cost_pvt <- closed_inc_nil %>%
+  group_by(ASSESSOR,has_cost) %>%
+  summarise(n=n()) %>%
+  pivot_wider(names_from = has_cost, values_from = n) %>%
+  mutate_all(coalesce,0) %>%
+  as.data.frame()
+
+colnames(closed_has_cost_pvt) <- c("ASSESSOR", "nil", "not_nil")
+
+#closed_has_cost_pvt <- mutate(closed_has_cost_pvt, p_nil = min(maxp_nil,(nil/(nil + not_nil))))
+closed_has_cost_pvt <- mutate(closed_has_cost_pvt, p_nil = nil/(nil + not_nil))
+
+#we have 5 parameters
+p_n <- 5
+
+#create an empty data frame and populate the first rows with large assessors and remainder with small
+params <- as.data.frame(rbind(
+  cbind(large_assessor$ASSESSOR,replicate(p_n,replicate(large_assessor_n,NA)))
+  , cbind(small_assessor$ASSESSOR,replicate(p_n,replicate(small_assessor_n,NA)))
+)
+)
+
+#set the column names
+colnames(params) <- c("ASSESSOR", "p_nil_0", "amt_shape", "amt_scale", "dur_shape", "dur_scale")
+
+#set tcolumn 2 to 6 datatypes to numeric
+for (i in 2:6){
+  params[,i] <- as.numeric(params[,i])
+}
+
+for (i in 1:large_assessor_n) {
+  p_p <- closed_has_cost_pvt %>% filter(ASSESSOR == params[i,1]) %>% dplyr::select(p_nil) %>% pull
+  amt_p <- closed %>% filter(ASSESSOR == params[i,1]) %>% dplyr::select(PAID_TO_DATE) %>% pull(PAID_TO_DATE) %>% fitdist(distr = "weibull", method = "mle")
+  dur_p <- closed %>% filter(ASSESSOR == params[i,1]) %>% dplyr::select(duration) %>% pull(duration) %>% fitdist(distr = "weibull", method = "mle")
+  params[i,2] <- p_p
+  params[i,3] <- as.numeric(amt_p$estimate[1])
+  params[i,4] <- as.numeric(amt_p$estimate[2])
+  params[i,5] <- as.numeric(dur_p$estimate[1])
+  params[i,6] <- as.numeric(dur_p$estimate[2])
+}
+
+#get the global parameters
+p_gp <- sum(closed_has_cost_pvt$nil)/(sum(closed_has_cost_pvt$nil)+sum(closed_has_cost_pvt$not_nil))
+amt_gp <- closed %>% dplyr::select(PAID_TO_DATE) %>% pull(PAID_TO_DATE) %>% fitdist(distr = "weibull", method = "mle")
+dur_gp <- closed %>% dplyr::select(duration) %>% pull(duration) %>% fitdist(distr = "weibull", method = "mle")
+
+#populate the small assessors with the global parameters
+params[(large_assessor_n + 1):(large_assessor_n + small_assessor_n),2] <- p_gp
+params[(large_assessor_n + 1):(large_assessor_n + small_assessor_n),3] <- amt_gp$estimate[1]
+params[(large_assessor_n + 1):(large_assessor_n + small_assessor_n),4] <- amt_gp$estimate[2]
+params[(large_assessor_n + 1):(large_assessor_n + small_assessor_n),5] <- dur_gp$estimate[1]
+params[(large_assessor_n + 1):(large_assessor_n + small_assessor_n),6] <- dur_gp$estimate[2]
+
+#apply global parameters to asha kumar and tee fong
+fong <- which(params$ASSESSOR == "Tee Fong")
+kumar <- which(params$ASSESSOR == "Asha Kumar")
+params[fong,2:6] <- c(p_gp,amt_gp$estimate[1],amt_gp$estimate[2],dur_gp$estimate[1],dur_gp$estimate[2])
+params[kumar,2:6] <- c(p_gp,amt_gp$estimate[1],amt_gp$estimate[2],dur_gp$estimate[1],dur_gp$estimate[2])
+
+#reduce the columns and join the parameters
+open <- left_join(open,params, by = "ASSESSOR") %>% dplyr::select(
+  CIMS_CLAIM_NUMBER
+  ,   ASSESSOR
+  ,   PAID_TO_DATE
+  ,   RESERVE
+  ,   duration
+  ,   p_nil_0
+  ,   amt_shape
+  ,   amt_scale
+  ,   dur_shape
+  ,   dur_scale
+)
+
+#generate [rplctn] predictions for each open claim
+#prediction that claim will have a cost x prediction that claim will close
+predict_matrix <- replicate(rplctns,
+                            (1 - rbinom(n_r,1,open$p_nil_0) * (open$PAID_TO_DATE == 0)) * 
+                              rbinom(
+                                n_r
+                                , 1
+                                , (pweibull((open$duration + d_rem),open$dur_shape,open$dur_scale) - pweibull(open$duration,open$dur_shape,open$dur_scale))/
+                                  (1-pweibull(open$duration,open$dur_shape,open$dur_scale))
+                              ) *
+                              pmax(
+                                open$PAID_TO_DATE
+                                , rweibull(n_r,open$amt_shape, open$amt_scale)) %>% floor()
+)
+
+#copy the matrix to preserve the original predictions in predict_matrix
+predict_matrix2 <- predict_matrix
+
+#remove the nils and above threshold outcomes from predict_matrix2
+predict_matrix2[predict_matrix2 == 0] <- NA
+predict_matrix2[predict_matrix2 >= cost_threshold] <- NA
+
+#generate output
+#histogram
+trial_output <- (colSums(predict_matrix2, na.rm=TRUE) + total_ytd_included_cost) /
+  (colSums(predict_matrix2 > -1, na.rm=TRUE) + total_ytd_included_closed_claims)
+hist(trial_output, breaks = 50)
+
+#percentiles table
+pctl_df <- data.frame(quantile((trial_output),seq(0,1, by = 0.1)))
+colnames(pctl_df) <- c("MEAN COST")
+pctl_df
