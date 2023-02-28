@@ -11,8 +11,6 @@ library(fitdistrplus)
 library(tidyr)
 
 #manual input section
-#load some data
-#the output of the report to be developed:
 #copy the worksheet to the clipboard the headings must be as follows (case sensitive)
 ## CIMS_CLAIM_NUMBER
 ## ASSESSOR
@@ -26,19 +24,14 @@ all <- read.table(file = "clipboard", sep = "\t", header=TRUE)
 #copy the list of event CIMS_CLAIM_NUMBERs to the clipboard. It must be headed CIMS_CLAIM_NUMBER
 event_claim <- read.table(file = "clipboard", sep = "\t", header=TRUE)
 
-#the following inputs are needed
-
-#I'm not sure of the exact cutoff value
+#set variables here
 cost_threshold <- 400000 #certificates above this value are excluded
-#confirm that the cutoff is 30 September
 termDt <- as.Date("2022-09-30")
+total_ytd_included_cost <- 3000000
+total_ytd_included_closed_claims <- 100
 
 #days remaining is derived from above
 d_rem <- as.numeric(termDt - Sys.Date()) #days remaining till incentive termination date
-
-#the values here are from the data from matthew hooker - it isn't right for this purpose
-total_ytd_included_cost <- 3000000
-total_ytd_included_closed_claims <- 100
 
 #set parameters for this script
 maxp_nil <- 0.9 #max probability that an open nil claim will close at nil
@@ -66,10 +59,10 @@ curr_assessor_n <- length(curr_assessor)
 #this is the binomial training set
 closed_inc_nil <- all %>% filter(CLAIM_STATUS=="CLOSED", ASSESSOR %in% curr_assessor)
 closed_inc_nil <- mutate(closed_inc_nil, has_cost = PAID_TO_DATE > 0)
+
 #this is the weibull training set
 closed <- closed_inc_nil %>% filter(PAID_TO_DATE > 0)
 closed <- closed %>% mutate(duration = as.numeric(closed$CLOSED_DATE - closed$DATE_CLAIM_NOTIFIED))
-
 
 #get the assessors with at least 10 certs and put their names in a single column data frame
 large_assessor <- closed %>% filter(ASSESSOR %in% curr_assessor) %>% group_by(ASSESSOR) %>% summarise(n=n()) %>% as.data.frame() %>% filter(n >= 10)
