@@ -1,0 +1,201 @@
+library(dplyr)
+library(readr)
+library(quantmod)
+library(faux)
+rm(list=ls())
+
+trials <- 10000
+
+#set coin symbols at start price
+#do not use yahoo published prices - they're different to tournament rules
+
+co1<-"BTC-USD"
+start1 <- 30280.67
+co2<-"ADA-USD"
+start2 <- 0.5325
+co3<-"ETH-USD"
+start3 <- 2017.27
+co4<-"SOL-USD"
+start4 <- 52.12
+co5<-"XRP-USD"
+start5 <- 0.41439/2
+
+histSt <- as.Date("2020-04-13") #approx date all cryptos trading
+histSt <- as.character(floor(as.numeric(as.POSIXct(histSt))))
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2023-11-29") 
+#get trading days - note crypto trades everyday including weekends an public holidays
+remainingCloses<-length(seq(stDt, endDt, "days"))
+
+#get historical price data, store current spot and std devn of log of proportional price
+#movement between histSt and now
+
+#company 1
+histData1<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co1
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData1<-data.frame(histData1)
+start1<- histData1 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull() %>% as.numeric()
+pricehistory1<-as.numeric(histData1$Adj.Close)
+pricehistory1<-pricehistory1[!is.na(pricehistory1)]
+spot1<-pricehistory1[length(pricehistory1)]
+sdMovementRatio1 <- sd(log(pricehistory1[1:length(pricehistory1)-1]/pricehistory1[2:(length(pricehistory1))]))
+
+#company 2
+histData2<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co2
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData2<-data.frame(histData2)
+start2<- histData2 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull() %>% as.numeric()
+pricehistory2<-as.numeric(histData2$Adj.Close)
+pricehistory2<-pricehistory2[!is.na(pricehistory2)]
+spot2<-pricehistory2[length(pricehistory2)]
+sdMovementRatio2 <- sd(log(pricehistory2[1:length(pricehistory2)-1]/pricehistory2[2:(length(pricehistory2))]))
+
+#company 3
+histData3<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co3
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData3<-data.frame(histData3)
+start3<- histData3 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull() %>% as.numeric()
+pricehistory3<-as.numeric(histData3$Adj.Close)
+pricehistory3<-pricehistory3[!is.na(pricehistory3)]
+spot3<-pricehistory3[length(pricehistory3)]
+sdMovementRatio3 <- sd(log(pricehistory3[1:length(pricehistory3)-1]/pricehistory3[2:(length(pricehistory3))]))
+
+#company 4
+histData4<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co4
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData4<-data.frame(histData4)
+start4<- histData4 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull() %>% as.numeric()
+pricehistory4<-as.numeric(histData4$Adj.Close)
+pricehistory4<-pricehistory4[!is.na(pricehistory4)]
+spot4<-pricehistory4[length(pricehistory4)]
+sdMovementRatio4 <- sd(log(pricehistory4[1:length(pricehistory4)-1]/pricehistory4[2:(length(pricehistory4))]))
+
+#company 5
+histData5<-read_csv(
+  paste0(
+    "https://query1.finance.yahoo.com/v7/finance/download/"
+    , co5
+    , paste0("?period1=" , histSt , "&period2=")
+    , floor(as.numeric(as.POSIXct(Sys.time())))
+    , "&interval=1d&events=history&includeAdjustedClose=true"
+  )
+)
+histData5<-data.frame(histData5)
+start5<- histData5 %>% filter(Date == "2022-05-19") %>% select(Adj.Close) %>% pull() %>% as.numeric()
+pricehistory5<-as.numeric(histData5$Adj.Close)
+pricehistory5<-pricehistory5[!is.na(pricehistory5)]
+spot5<-pricehistory5[length(pricehistory5)]
+sdMovementRatio5 <- sd(log(pricehistory5[1:length(pricehistory5)-1]/pricehistory5[2:(length(pricehistory5))]))
+
+#store correlation matrix of proce histories
+cmat <- cor(
+  cbind(
+    pricehistory1
+    , pricehistory2
+    , pricehistory3
+    , pricehistory4
+    , pricehistory5
+  )
+)
+
+
+startpoints<-c(start1,start2,start3,start4,start5)
+result<-matrix(
+  replicate(trials,
+            cumprod(exp(rnorm_multi(  remainingCloses
+                                      ,  mu=rep(0,5)
+                                      ,  sd=c(  sdMovementRatio1
+                                                , sdMovementRatio2
+                                                , sdMovementRatio3
+                                                , sdMovementRatio4
+                                                , sdMovementRatio5
+                                      )
+                                      ,  r=cmat
+                                      ,  empirical=FALSE))
+            )[remainingCloses,]
+  )
+  ,  nrow = trials
+  ,  ncol = 5
+  ,  byrow=FALSE
+)
+
+#collate the results and store the number of times each cin performed best
+spots <- c(spot1,spot2,spot3,spot4,spot5)
+result<-matrix(unlist(result),nrow = trials)
+result <- t(t(result)*(c(spot1,spot2,spot3,spot4,spot5)/c(start1,start2,start3,start4,start5)))
+winner<-apply(result,1,which.max)
+output<-c(sum(winner==1)/trials,sum(winner==2)/trials,sum(winner==3)/trials,sum(winner==4)/trials,sum(winner==5)/trials)
+
+par(mfrow=c(1,2))
+#present coin perfromances in a column chart
+heights <- spots/startpoints
+barnames <- c(co1,co2,co3,co4,co5)
+bp <- barplot(
+        height = heights
+        , xlab="Coin"
+        , names.arg = barnames
+        , ylab = "%"
+        , main = paste(format(stDt, "%Y%m%d"), " price / ",format(endDt, "%Y%m%d"), " price (USD)")
+        , col=ifelse(heights < 1, "darkred", "darkblue")
+        , border=NA
+        , space=1
+)
+#calculate bar label positions (inside bar if max or near max)
+barlabelPositions <- heights +0.03 + (heights > max(heights) * 0.9) * -0.06
+text(bp
+     , barlabelPositions
+     , paste(format(round(heights * 100 ,1) ,T),"%", sep = "")
+     , col = ifelse (heights > max(heights) * 0.9,"white","black")
+     , cex = 0.6
+    )
+
+#present probabilities by bin in a bar plot
+#first reverse order of inputs - barplots are annoying
+output <- rev(output)
+barnames <- rev(barnames)
+bp <- barplot(
+        height = output
+      , xlab = "%"
+      , names.arg = barnames
+      , main = "Probs by Bin"
+      , col = "palegreen4"
+      , horiz = TRUE
+)
+barlabelPositions <- output +0.02 + (output > 1/(length(output) + 1)) * -0.04
+text(barlabelPositions
+     , bp
+     , paste(format(round(rev(output) * 100 ,1) ,T),"%", sep = "")
+     , cex = 0.7
+)
+#restore the order in case you want to add something later and forget the order was reversed
+output <- rev(output)
+barnames <- rev(barnames)
+par(mfrow=c(1,1))
