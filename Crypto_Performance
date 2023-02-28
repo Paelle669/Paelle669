@@ -6,6 +6,7 @@ rm(list=ls())
 
 #this script answers the GJO question at
 #https://www.gjopen.com/questions/2393-which-of-the-following-major-cryptocurrencies-will-perform-best-between-19-may-2022-and-29-november-2022
+#but note it has been amended to estimate probabilities at 2023-11-29
 
 trials <- 10000
 
