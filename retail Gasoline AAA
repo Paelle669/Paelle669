@@ -1,0 +1,40 @@
+#What will be the national average price of a gallon of gasoline on 3 July 2024, according to
+#the American Automobile Association (AAA)?
+
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(patchwork)
+rm(list=ls()) #https://gasprices.aaa.com/
+
+sht_trm_spts <- c(3.262 #26/2/2024
+                  ,3.279 #19/2/2024
+                  )
+spot <- sht_trm_spts[1]
+ln <- length(sht_trm_spts)
+sdMovementRatio <- sd(log(sht_trm_spts[2:ln]/sht_trm_spts[1:(ln-1)]))
+
+#gonna use 0.021 till I get a bit more 2024 data
+sdMovementRatio <- 0.021
+
+stDt <- as.Date(Sys.time())
+endDt <- as.Date("2024-07-03")
+
+remainingCloses<-sum(weekdays(seq(stDt, endDt, "days")) %in% c("Monday"))
+forecastBands <- c(-Inf,2.25,2.55,2.85,3.15,3.45,3.75,4.05,4.35,4.65,Inf)
+
+simulation<-spot*replicate(10000,
+                           cumprod(exp(rnorm(
+                             remainingCloses,mean = 0, sd = sdMovementRatio
+                           )))[remainingCloses])
+cutSimulation<-as_tibble(cut(simulation,forecastBands))
+
+plot1 <- simulation %>% data.frame() %>% ggplot(aes(simulation)) + geom_density(fill = "green", alpha = 0.2)
+plot3 <- simulation %>% data.frame() %>% ggplot(aes(simulation)) + 
+  stat_ecdf(geom='area', col = "black", fill = "darkgreen", alpha = 0.2) + 
+  geom_vline(xintercept = forecastBands[-c(1,length(forecastBands))],col="darkgreen") + 
+  theme_bw()
+plot2 <- rev(sht_trm_spts) %>% data.frame() %>% ggplot(aes(c(1:ln),rev(sht_trm_spts))) + geom_point(col = "blue") + geom_line(color="blue",alpha = 0.4)
+plot2 + plot1 + plot3
+
+mutate(dplyr::count(cutSimulation,value),n/sum(n))
